@@ -1,5 +1,7 @@
 from collections.abc import Sequence
 
+import threading
+
 import cv2
 import numpy as np
 
@@ -149,7 +151,7 @@ class BoxSmoother:
         return (x1, y1, x2, y2)
 
 
-_crop_buffer: np.ndarray | None = None
+_crop_buffers: threading.local = threading.local()
 
 
 def crop_frame(
@@ -158,8 +160,6 @@ def crop_frame(
     output_width: int = 1280,
     output_height: int = 720,
 ) -> np.ndarray:
-    global _crop_buffer
-
     if crop_box is None:
         x1, y1, x2, y2 = 0, 0, frame.shape[1], frame.shape[0]
     else:
@@ -170,11 +170,13 @@ def crop_frame(
     if cropped.shape[:2] == (output_height, output_width):
         return cropped
 
-    if _crop_buffer is None or _crop_buffer.shape[:2] != (output_height, output_width, 3):
-        _crop_buffer = np.zeros((output_height, output_width, 3), dtype=np.uint8)
+    buf: np.ndarray | None = getattr(_crop_buffers, "buf", None)
+    if buf is None or buf.shape[:2] != (output_height, output_width):
+        buf = np.zeros((output_height, output_width, 3), dtype=np.uint8)
+        _crop_buffers.buf = buf
 
-    cv2.resize(cropped, (output_width, output_height), dst=_crop_buffer)
-    return _crop_buffer
+    cv2.resize(cropped, (output_width, output_height), dst=buf)
+    return buf
 
 
 def draw_detections(
