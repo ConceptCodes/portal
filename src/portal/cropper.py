@@ -1,10 +1,23 @@
+import math
 import threading
 from collections.abc import Sequence
+from functools import lru_cache
 
 import cv2
 import numpy as np
 
 from portal.detector import Detection
+
+
+@lru_cache(maxsize=4)
+def _frame_constants(
+    frame_width: int, frame_height: int
+) -> tuple[float, float, float, float]:
+    frame_area = frame_width * frame_height
+    fc_x = frame_width / 2.0
+    fc_y = frame_height / 2.0
+    max_dist = math.hypot(frame_width, frame_height) / 2.0
+    return frame_area, fc_x, fc_y, max_dist
 
 
 def select_primary_subject(
@@ -26,9 +39,7 @@ def select_primary_subject(
         track_ages = {}
 
     max_age = max(track_ages.values()) if track_ages else 1
-    frame_area = frame_width * frame_height
-    fc_x, fc_y = frame_width / 2.0, frame_height / 2.0
-    max_dist = np.sqrt(frame_width**2 + frame_height**2) / 2.0
+    frame_area, fc_x, fc_y, max_dist = _frame_constants(frame_width, frame_height)
 
     best_score = -1.0
     best_detection = detections[0]
@@ -40,7 +51,7 @@ def select_primary_subject(
 
         cx = (d.x1 + d.x2) / 2.0
         cy = (d.y1 + d.y2) / 2.0
-        center_dist = np.sqrt((cx - fc_x) ** 2 + (cy - fc_y) ** 2)
+        center_dist = math.hypot(cx - fc_x, cy - fc_y)
         center_score = 1.0 - center_dist / max_dist
 
         age = track_ages.get(d.track_id, 1) if d.track_id is not None else 1
@@ -89,7 +100,7 @@ class BoxSmoother:
         frame_width: int,
         frame_height: int,
     ) -> tuple[int, int, int, int]:
-        frame_diag = np.sqrt(frame_width**2 + frame_height**2)
+        frame_diag = math.hypot(frame_width, frame_height)
 
         if detection is None:
             self._coast_count += 1
@@ -124,7 +135,7 @@ class BoxSmoother:
             assert self._smooth_cx is not None and self._smooth_cy is not None
             scx = self._smooth_cx
             scy = self._smooth_cy
-            center_dist = np.sqrt((raw_cx - scx) ** 2 + (raw_cy - scy) ** 2)
+            center_dist = math.hypot(raw_cx - scx, raw_cy - scy)
             alpha = self._alpha
             if center_dist / frame_diag > self._jump_threshold:
                 alpha = 1.0

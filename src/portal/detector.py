@@ -81,34 +81,32 @@ class PersonDetector:
             raise ModelError(f"Inference failed: {exc}") from exc
         detections: list[Detection] = []
         for result in results:
-            if result.boxes is not None and result.boxes.id is not None:
-                boxes = result.boxes
-                ids = boxes.id
-                if ids is None:
-                    continue
-                for i in range(len(boxes)):
-                    box = boxes[i]
-                    tid = int(ids[i].item())
-                    x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-                    detections.append(
-                        Detection(
-                            x1=x1,
-                            y1=y1,
-                            x2=x2,
-                            y2=y2,
-                            confidence=float(box.conf[0]),
-                            track_id=tid,
-                        )
+            if result.boxes is None or result.boxes.id is None:
+                continue
+            boxes = result.boxes
+            xyxy = boxes.xyxy.cpu().int().numpy()  # type: ignore[union-attr]
+            confs = boxes.conf.cpu().numpy()  # type: ignore[union-attr]
+            ids = boxes.id.cpu().int().numpy()  # type: ignore[union-attr]
+            for i in range(len(boxes)):
+                x1, y1, x2, y2 = xyxy[i].tolist()
+                detections.append(
+                    Detection(
+                        x1=x1,
+                        y1=y1,
+                        x2=x2,
+                        y2=y2,
+                        confidence=float(confs[i]),
+                        track_id=int(ids[i]),
                     )
+                )
 
-        current_ids = {d.track_id for d in detections if d.track_id is not None}
-        for tid in list(self._track_ages.keys()):
-            if tid in current_ids:
-                self._track_ages[tid] += 1
-            else:
+        current_ids: set[int] = set()
+        for d in detections:
+            if d.track_id is not None:
+                current_ids.add(d.track_id)
+                self._track_ages[d.track_id] = self._track_ages.get(d.track_id, 0) + 1
+        for tid in list(self._track_ages):
+            if tid not in current_ids:
                 del self._track_ages[tid]
-        for tid in current_ids:
-            if tid not in self._track_ages:
-                self._track_ages[tid] = 1
 
         return detections

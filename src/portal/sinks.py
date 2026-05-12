@@ -124,14 +124,17 @@ class NDISink(VideoSink):
             raise RuntimeError("Failed to create NDI send instance")
 
         self._frame_data = None
+        self._bgra_buf: np.ndarray | None = None
 
     def write(self, frame: np.ndarray) -> None:
-        rgba = cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA)
+        if self._bgra_buf is None or self._bgra_buf.shape[:2] != frame.shape[:2]:
+            self._bgra_buf = np.empty((*frame.shape[:2], 4), dtype=np.uint8)
+        cv2.cvtColor(frame, cv2.COLOR_BGR2BGRA, dst=self._bgra_buf)
         video_frame = self._ndi.VideoFrameV2()
-        video_frame.data = rgba.tobytes()
+        video_frame.data = self._bgra_buf.tobytes()
         video_frame.FourCC = self._ndi.FOURCC_VIDEO_TYPE_BGRA
-        video_frame.xres = rgba.shape[1]
-        video_frame.yres = rgba.shape[0]
+        video_frame.xres = self._bgra_buf.shape[1]
+        video_frame.yres = self._bgra_buf.shape[0]
         video_frame.frame_rate_D = 1
         video_frame.frame_rate_N = int(self._fps)
         video_frame.picture_aspect_ratio = self._width / self._height
