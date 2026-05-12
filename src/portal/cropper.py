@@ -1,6 +1,5 @@
-from collections.abc import Sequence
-
 import threading
+from collections.abc import Sequence
 
 import cv2
 import numpy as np
@@ -122,16 +121,20 @@ class BoxSmoother:
             self._smooth_h = raw_h
             self._last_raw_area = raw_area
         else:
-            center_dist = np.sqrt((raw_cx - self._smooth_cx) ** 2 + (raw_cy - self._smooth_cy) ** 2)
+            assert self._smooth_cx is not None and self._smooth_cy is not None
+            scx = self._smooth_cx
+            scy = self._smooth_cy
+            center_dist = np.sqrt((raw_cx - scx) ** 2 + (raw_cy - scy) ** 2)
             alpha = self._alpha
             if center_dist / frame_diag > self._jump_threshold:
                 alpha = 1.0
 
-            self._smooth_cx = alpha * raw_cx + (1 - alpha) * self._smooth_cx
-            self._smooth_cy = alpha * raw_cy + (1 - alpha) * self._smooth_cy
+            self._smooth_cx = alpha * raw_cx + (1 - alpha) * scx
+            self._smooth_cy = alpha * raw_cy + (1 - alpha) * scy
 
             if self._last_raw_area is not None:
-                area_change = abs(raw_area - self._last_raw_area) / max(self._last_raw_area, 1)
+                lra = self._last_raw_area
+                area_change = abs(raw_area - lra) / max(lra, 1)
                 if area_change > 0.20:
                     self._smooth_w = raw_w
                     self._smooth_h = raw_h
@@ -140,14 +143,15 @@ class BoxSmoother:
         return self._compute_box(frame_width, frame_height)
 
     def _compute_box(self, frame_width: int, frame_height: int) -> tuple[int, int, int, int]:
-        x1 = int(self._smooth_cx - self._smooth_w / 2)
-        y1 = int(self._smooth_cy - self._smooth_h / 2)
-        x2 = int(self._smooth_cx + self._smooth_w / 2)
-        y2 = int(self._smooth_cy + self._smooth_h / 2)
-        x1 = max(0, x1)
-        y1 = max(0, y1)
-        x2 = min(frame_width, x2)
-        y2 = min(frame_height, y2)
+        cx = self._smooth_cx
+        cy = self._smooth_cy
+        w = self._smooth_w
+        h = self._smooth_h
+        assert cx is not None and cy is not None and w is not None and h is not None
+        x1 = max(0, int(cx - w / 2))
+        y1 = max(0, int(cy - h / 2))
+        x2 = min(frame_width, int(cx + w / 2))
+        y2 = min(frame_height, int(cy + h / 2))
         return (x1, y1, x2, y2)
 
 

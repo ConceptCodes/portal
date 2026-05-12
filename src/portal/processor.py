@@ -1,6 +1,6 @@
 import queue
 import threading
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from pathlib import Path
 
 import cv2
@@ -8,7 +8,7 @@ import numpy as np
 
 from portal.config import ProcessorConfig
 from portal.cropper import BoxSmoother, crop_frame, draw_detections, select_primary_subject
-from portal.detector import PersonDetector, VideoError
+from portal.detector import Detection, PersonDetector, VideoError
 
 
 class FileProcessor:
@@ -54,7 +54,7 @@ class FileProcessor:
                 cropped = crop_frame(frame, crop_box, self._config.width, self._config.height)
 
                 if writer is None:
-                    fourcc = cv2.VideoWriter_fourcc(*"avc1")
+                    fourcc = cv2.VideoWriter_fourcc(*"avc1")  # pyright: ignore[reportAttributeAccessIssue]
                     output_path.parent.mkdir(parents=True, exist_ok=True)
                     writer = cv2.VideoWriter(
                         str(output_path),
@@ -113,8 +113,8 @@ class LiveProcessor:
         if fps <= 0:
             fps = 30
 
-        capture_q: queue.Queue[tuple[int, np.ndarray]] = queue.Queue(maxsize=1)
-        result_q: queue.Queue[tuple[np.ndarray, np.ndarray, list]] = queue.Queue(maxsize=1)
+        capture_q: queue.Queue = queue.Queue(maxsize=1)
+        result_q: queue.Queue = queue.Queue(maxsize=1)
 
         self._running = True
         frame_index = 0
@@ -138,8 +138,8 @@ class LiveProcessor:
                 alpha=self._config.alpha,
                 jump_threshold=self._config.jump_threshold,
             )
-            last_crop_box = None
-            last_detections: list = []
+            last_crop_box: tuple[int, int, int, int] | None = None
+            last_detections: Sequence[Detection] = []
 
             while self._running:
                 try:
@@ -178,7 +178,7 @@ class LiveProcessor:
             writer: cv2.VideoWriter | None = None
 
             if output_path is not None:
-                fourcc = cv2.VideoWriter_fourcc(*"avc1")
+                fourcc = cv2.VideoWriter_fourcc(*"avc1")  # pyright: ignore[reportAttributeAccessIssue]
                 output_path.parent.mkdir(parents=True, exist_ok=True)
                 writer = cv2.VideoWriter(
                     str(output_path),
@@ -190,7 +190,7 @@ class LiveProcessor:
             try:
                 while self._running:
                     try:
-                        cropped, original, detections = result_q.get(timeout=1.0)
+                        cropped, original, detections = result_q.get(timeout=1.0)  # pyright: ignore[reportAssignmentType]
                     except queue.Empty:
                         continue
 

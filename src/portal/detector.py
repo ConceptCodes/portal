@@ -1,10 +1,9 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
-from pathlib import Path
 
 import numpy as np
 import torch
-from ultralytics import YOLO
+from ultralytics import YOLO  # pyright: ignore[reportPrivateImportUsage]
 
 
 class PortalError(Exception):
@@ -59,7 +58,8 @@ class PersonDetector:
 
     @property
     def model_name(self) -> str:
-        return self._model.model_name
+        name = self._model.model_name
+        return name if name is not None else ""
 
     def warmup(self) -> None:
         dummy = np.zeros((640, 640, 3), dtype=np.uint8)
@@ -82,9 +82,14 @@ class PersonDetector:
         detections: list[Detection] = []
         for result in results:
             if result.boxes is not None and result.boxes.id is not None:
-                for box, track_id in zip(result.boxes, result.boxes.id):
+                boxes = result.boxes
+                ids = boxes.id
+                if ids is None:
+                    continue
+                for i in range(len(boxes)):
+                    box = boxes[i]
+                    tid = int(ids[i].item())
                     x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-                    tid = int(track_id.item())
                     detections.append(
                         Detection(
                             x1=x1,
