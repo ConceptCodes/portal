@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.ruff_cache/
+.venv/
+*.egg-info/
+dist/
+
+# Model weights (downloaded on demand)
+*.pt
