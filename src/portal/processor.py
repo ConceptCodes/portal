@@ -9,6 +9,7 @@ import numpy as np
 from portal.config import ProcessorConfig
 from portal.cropper import BoxSmoother, crop_frame, draw_detections, select_primary_subject
 from portal.detector import Detection, PersonDetector, VideoError
+from portal.sinks import DisplaySink, VideoSink
 
 
 class FileProcessor:
@@ -102,16 +103,26 @@ class LiveProcessor:
         self._config = config
         self._running = False
 
-    def run(self, camera_id: int = 0, output_path: Path | None = None) -> None:
+    def run(
+        self,
+        camera_id: int = 0,
+        sinks: VideoSink | list[VideoSink] | None = None,
+        fps: float = 30,
+    ) -> None:
         cap = cv2.VideoCapture(camera_id)
         if not cap.isOpened():
             raise VideoError(f"Could not open camera {camera_id}")
 
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        if fps <= 0:
-            fps = 30
+        if sinks is None:
+            sinks = [DisplaySink()]
+        elif isinstance(sinks, VideoSink):
+            sinks = [sinks]
+
+        from portal.sinks import CompositeSink
+
+        output = CompositeSink(sinks)
 
         capture_q: queue.Queue = queue.Queue(maxsize=1)
         result_q: queue.Queue = queue.Queue(maxsize=1)
@@ -175,18 +186,6 @@ class LiveProcessor:
                     pass
 
         def display_loop() -> None:
-            writer: cv2.VideoWriter | None = None
-
-            if output_path is not None:
-                fourcc = cv2.VideoWriter_fourcc(*"avc1")  # pyright: ignore[reportAttributeAccessIssue]
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                writer = cv2.VideoWriter(
-                    str(output_path),
-                    fourcc,
-                    fps,
-                    (self._config.width, self._config.height),
-                )
-
             try:
                 while self._running:
                     try:
@@ -194,19 +193,13 @@ class LiveProcessor:
                     except queue.Empty:
                         continue
 
-                    cv2.imshow("Portal - Original", draw_detections(original, detections))
-                    cv2.imshow("Portal - Cropped", cropped)
-
-                    if writer is not None:
-                        writer.write(cropped)
+                    output.write(cropped)
 
                     if cv2.waitKey(1) & 0xFF == ord("q"):
                         self._running = False
                         break
             finally:
-                cv2.destroyAllWindows()
-                if writer is not None:
-                    writer.release()
+                output.close()
 
         capture_thread = threading.Thread(target=capture_loop, daemon=True)
         inference_thread = threading.Thread(target=inference_loop, daemon=True)

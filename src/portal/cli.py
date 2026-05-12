@@ -1,11 +1,13 @@
 import logging
 from pathlib import Path
 
+import cv2
 import typer
 
 from portal.config import ProcessorConfig
 from portal.detector import PersonDetector
 from portal.processor import FileProcessor, LiveProcessor
+from portal.sinks import DisplaySink, FileSink, NDISink, StreamSink, VideoSink
 
 logger = logging.getLogger("portal")
 
@@ -116,8 +118,25 @@ def live(
     ),
     track_id: int | None = typer.Option(None, "--track-id", help="Lock to a specific track ID"),
     output: Path | None = typer.Option(None, help="Record cropped output to file"),
+    ndi_name: str | None = typer.Option(
+        None,
+        "--ndi-name",
+        help="Broadcast cropped feed as an NDI source with this name",
+    ),
+    stream_url: str | None = typer.Option(
+        None,
+        "--stream-url",
+        help="Stream cropped feed to URL (e.g. rtmp://..., udp://...)",
+    ),
+    no_display: bool = typer.Option(
+        False,
+        "--no-display",
+        help="Disable preview windows (headless mode)",
+    ),
 ) -> None:
-    config = _build_config(
+    _setup_logging()
+
+    config = ProcessorConfig(
         model=model,
         conf=conf,
         padding=padding,
@@ -126,17 +145,35 @@ def live(
         alpha=alpha,
         jump_threshold=jump_threshold,
         track_id=track_id,
-        show=True,
-        skip=0,
-        output=str(output) if output else None,
     )
-
-    _setup_logging()
 
     detector = PersonDetector(config.model)
     logger.info("Loading model: %s (device: %s)", config.model, detector.device)
     detector.warmup()
     logger.info("Starting camera %s...", camera_id)
 
+    cap = cv2.VideoCapture(camera_id)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps <= 0:
+        fps = 30
+    cap.release()
+
+    sinks: list[VideoSink] = []
+
+    if not no_display:
+        sinks.append(DisplaySink())
+
+    if output is not None:
+        sinks.append(FileSink(output, fps, width, height))
+
+    if ndi_name is not None:
+        sinks.append(NDISink(ndi_name, width, height, fps))
+
+    if stream_url is not None:
+        sinks.append(StreamSink(stream_url, width, height, fps))
+
+    if sinks:
+        logger.info("Outputs: %s", [type(s).__name__ for s in sinks])
+
     processor = LiveProcessor(detector, config)
-    processor.run(camera_id, output)
+    processor.run(camera_id, sinks=sinks if sinks else None, fps=fps)
