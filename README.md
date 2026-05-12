@@ -21,12 +21,6 @@ Autonomous video cropping — detect people in frame and crop to focus on them. 
 uv sync
 ```
 
-Or with pip:
-
-```bash
-pip install -e .
-```
-
 ## Usage
 
 ### Live camera
