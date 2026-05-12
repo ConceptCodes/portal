@@ -1,9 +1,33 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import torch
 from ultralytics import YOLO
+
+
+class PortalError(Exception):
+    """Base exception for all portal errors."""
+
+
+class ModelError(PortalError):
+    """Raised when model loading or inference fails."""
+
+
+class VideoError(PortalError):
+    """Raised when video input/output operations fail."""
+
+
+_TRACKER_CONFIG = "bytetrack.yaml"
+
+
+def _resolve_device() -> str:
+    if torch.cuda.is_available():
+        return "cuda:0"
+    if torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
 
 
 @dataclass(frozen=True)
@@ -18,8 +42,11 @@ class Detection:
 
 class PersonDetector:
     def __init__(self, model_name: str = "yolov8n.pt") -> None:
-        self._device = "mps" if torch.backends.mps.is_available() else "cpu"
-        self._model = YOLO(model_name)
+        self._device = _resolve_device()
+        try:
+            self._model = YOLO(model_name)
+        except Exception as exc:
+            raise ModelError(f"Failed to load model '{model_name}': {exc}") from exc
         self._track_ages: dict[int, int] = {}
 
     @property
@@ -36,19 +63,22 @@ class PersonDetector:
 
     def warmup(self) -> None:
         dummy = np.zeros((640, 640, 3), dtype=np.uint8)
-        self._model(dummy, device=self._device, verbose=False)
-        self._model(dummy, device=self._device, verbose=False)
+        for _ in range(2):
+            self._model(dummy, device=self._device, verbose=False)
 
     def detect(self, frame: np.ndarray, conf_threshold: float = 0.5) -> Sequence[Detection]:
-        results = self._model.track(
-            frame,
-            classes=[0],
-            conf=conf_threshold,
-            persist=True,
-            tracker="bytetrack.yaml",
-            device=self._device,
-            verbose=False,
-        )
+        try:
+            results = self._model.track(
+                frame,
+                classes=[0],
+                conf=conf_threshold,
+                persist=True,
+                tracker=_TRACKER_CONFIG,
+                device=self._device,
+                verbose=False,
+            )
+        except Exception as exc:
+            raise ModelError(f"Inference failed: {exc}") from exc
         detections: list[Detection] = []
         for result in results:
             if result.boxes is not None and result.boxes.id is not None:

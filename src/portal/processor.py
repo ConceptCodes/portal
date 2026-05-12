@@ -8,7 +8,7 @@ import numpy as np
 
 from portal.config import ProcessorConfig
 from portal.cropper import BoxSmoother, crop_frame, draw_detections, select_primary_subject
-from portal.detector import PersonDetector
+from portal.detector import PersonDetector, VideoError
 
 
 class FileProcessor:
@@ -26,7 +26,7 @@ class FileProcessor:
 
         cap = cv2.VideoCapture(str(input_path))
         if not cap.isOpened():
-            raise RuntimeError(f"Could not open video: {input_path}")
+            raise VideoError(f"Could not open video: {input_path}")
 
         smoother = BoxSmoother(
             padding=self._config.padding,
@@ -105,7 +105,7 @@ class LiveProcessor:
     def run(self, camera_id: int = 0, output_path: Path | None = None) -> None:
         cap = cv2.VideoCapture(camera_id)
         if not cap.isOpened():
-            raise RuntimeError(f"Could not open camera {camera_id}")
+            raise VideoError(f"Could not open camera {camera_id}")
 
         cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 

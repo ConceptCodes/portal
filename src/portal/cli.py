@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 import typer
@@ -5,6 +6,17 @@ import typer
 from portal.config import ProcessorConfig
 from portal.detector import PersonDetector
 from portal.processor import FileProcessor, LiveProcessor
+
+logger = logging.getLogger("portal")
+
+
+def _setup_logging() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S",
+    )
+
 
 app = typer.Typer(help="Portal - automatic video cropping around detected people")
 
@@ -70,10 +82,12 @@ def process(
         skip=skip,
     )
 
+    _setup_logging()
+
     detector = PersonDetector(config.model)
-    typer.echo(f"Loading model: {config.model} (device: {detector.device})")
+    logger.info("Loading model: %s (device: %s)", config.model, detector.device)
     detector.warmup()
-    typer.echo("Model ready")
+    logger.info("Model ready")
 
     processor = FileProcessor(detector, config)
 
@@ -82,7 +96,7 @@ def process(
             progress.label = f"Frame {current}/{total}"
             progress.update(1)
 
-    typer.echo(f"Done. Output written to {output}")
+    logger.info("Done. Output written to %s", output)
 
 
 @app.command()
@@ -117,10 +131,12 @@ def live(
         output=str(output) if output else None,
     )
 
+    _setup_logging()
+
     detector = PersonDetector(config.model)
-    typer.echo(f"Loading model: {config.model} (device: {detector.device})")
+    logger.info("Loading model: %s (device: %s)", config.model, detector.device)
     detector.warmup()
-    typer.echo(f"Starting camera {camera_id}...")
+    logger.info("Starting camera %s...", camera_id)
 
     processor = LiveProcessor(detector, config)
     processor.run(camera_id, output)
