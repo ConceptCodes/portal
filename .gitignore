@@ -5,5 +5,8 @@ __pycache__/
 *.egg-info/
 dist/
 
+# Agent instructions
+.agents/
+
 # Model weights (downloaded on demand)
 *.pt
