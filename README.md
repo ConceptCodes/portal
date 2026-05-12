@@ -2,6 +2,16 @@
 
 Autonomous video cropping — detect people in frame and crop to focus on them. Designed for live performances (church services, conferences, talks) where you want an auto-PTZ effect without a camera operator.
 
+## Demo
+
+**Before** (full frame, camera on the speaker):
+<video src="samples/before.mp4" width="320" controls></video>
+
+**After** (automatically cropped and centered):
+<video src="samples/after.mp4" width="320" controls></video>
+
+The cropping adapts in real-time as the speaker moves, with smooth cinematic panning and no jarring jumps.
+
 ## Features
 
 - **Person detection** via YOLO + ByteTrack with stable track IDs
