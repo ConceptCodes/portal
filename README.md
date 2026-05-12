@@ -4,13 +4,12 @@ Autonomous video cropping — detect people in frame and crop to focus on them. 
 
 ## Demo
 
-**Before** (full frame, camera on the speaker):
-[![Before](https://img.shields.io/badge/Watch-Before%20Video-blue?style=for-the-badge&logo=github)](samples/before.mp4)
+See the full before/after comparison in the `samples/` directory:
 
-**After** (automatically cropped and centered):
-[![After](https://img.shields.io/badge/Watch-After%20Video-green?style=for-the-badge&logo=github)](samples/after.mp4)
+- **[Before: Full frame original](samples/before.mp4)** — camera positioned on the speaker, wide shot
+- **[After: Auto-cropped output](samples/after.mp4)** — intelligently cropped to follow the speaker with smooth panning
 
-The cropping adapts in real-time as the speaker moves, with smooth cinematic panning and no jarring jumps. See the full videos in the `samples/` directory.
+The cropping adapts in real-time as the speaker moves, with smooth cinematic panning and no jarring jumps.
 
 ## Features
 
