@@ -1,6 +1,5 @@
 import cv2
 import numpy as np
-import pytest
 
 from portal.cropper import BoxSmoother, crop_frame, draw_detections, select_primary_subject
 from portal.detector import Detection
